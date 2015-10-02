@@ -4,7 +4,7 @@ This code creates a data structure to compute, in constant time, the RMQ(i,j) on
 Authors: Hector Ferrada and Gonzalo Navarro 
 hferrada@dcc.uchile.cl, gnavarro@dcc.uchile.cl
 
-Description: 
+Description:<br />
 This is an RMQ compressed data structure. The implementation is based on the method of Fischer and Heun [1]. 
 Their method uses a tree representation with DFUDS. We use Range Min-Max Tree of Sadakane and Navarro [2]. 
 In order to reduce the size, our rmq uses a simplified version of the Range min-max tree of Navarro and Sadakane [2], 
