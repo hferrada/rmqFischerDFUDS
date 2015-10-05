@@ -13,7 +13,7 @@ using namespace dfudsrmq;
 
 bool TRACE = false;		// true: print all details for console
 bool TEST = true;		// true: apply exhaustive test
-uint N_REP = 2000000;		// number of REPETITIONS
+uint N_REP = 200000;		// number of REPETITIONS
 bool RANDOM = true;		// true, random vales (i,j) for test rmq->queryRMQ(i,j)
 bool DOWN = true;		// true, decrease pseudosorted arrays
 bool LOAD_CREATE = true;		// 0/1 LOAD/CRATE

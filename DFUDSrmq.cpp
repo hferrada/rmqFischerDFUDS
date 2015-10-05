@@ -44,61 +44,68 @@ DFUDSrmq::DFUDSrmq(long int *A, ulong len) {
 	if (nP % W64)
 		lenP++;
 	P = new ulong[lenP];
+	//ulong* P2 = new ulong[lenP];
+
 	sizeDS += lenP*sizeof(ulong);		// 2n bits OF TOPOLOGY ARE INCLUDED  !!
 	if (true || TRACE) cout << " ** size of topology " << lenP*sizeof(ulong) << " Bytes" << endl;
 
-	// create DFUDS sequence in P[1..2*len]
-	ulong i, k, pos;
+	cout << "Creating DFUDS sequence in P[1..2*len]" << endl;
+	ulong i, k, pos, item, childRoot=1;
 	long int j;
+	ulong *father = new ulong[len];
 	ulong *nChild = new ulong[len];
-	ulong childRoot = 1;
-	{
-		for(i=0; i<len; i++)
-			nChild[i]=0;
 
-		for(i=1; i<len; i++){
-			for(j=i-1; j>=0 && A[j]>=A[i]; j--);
-			if (j<0)
-				childRoot++;
-			else
-				(nChild[j])++;
+	cout << "Setting father and children..." << endl;
+	for(i=0; i<len; i++)
+		nChild[i]=0;
+	father[0] = -1;
+	for(i=1; i<len; i++){
+		j=i-1;
+		item = A[i];
+		while(j>=0 && A[j]>=item)
+			j = father[j];
+		if (j<0)
+			childRoot++;
+		else{
+			father[i] = j;
+			(nChild[j])++;
 		}
+	}
+	delete [] father;
 
-		setBit64(P, 0);
-		pos=1;
-		for(i=0; i<childRoot; i++, pos++)
+	cout << "Putting parenthesis..." << endl;
+	setBit64(P, 0);
+	pos=1;
+	for(i=0; i<childRoot; i++, pos++)
+		setBit64(P, pos);
+	cleanBit64(P, pos);
+	pos++;
+
+	for(i=0; i<len; i++){
+		for(k=0; k<nChild[i]; k++, pos++)
 			setBit64(P, pos);
 		cleanBit64(P, pos);
 		pos++;
-
-		for(i=0; i<len; i++){
-			for(k=0; k<nChild[i]; k++, pos++)
-				setBit64(P, pos);
-			cleanBit64(P, pos);
-			pos++;
-		}
-	}
-
-	if (TRACE){
-		cout << " nChild[0.." << len << "]" << endl << childRoot << " ";
-		for(i=0; i<len; i++)
-			cout << nChild[i] << " ";
-		cout << endl;
 	}
 	delete [] nChild;
+	cout << "DFUDS TREE REPRESENTATION OK !!" << endl;
 
 	if(RUNTEST){ // test for balanced sequence
 		long int sum = 0;
 		ulong r=0;
 
 		for (; r<nP; r++){
+			/*if(readBit64(P, r) != readBit64(P2, r)){
+				cout << " ERROR. readBit64(P, r) != readBit64(P2, r).... r = " << r << endl;
+				exit(1);
+			}*/
 			if(readBit64(P, r))
 				sum++;
 			else sum--;
 		}
 		if(sum != 0){
 			cout << " ERROR. DFUDS-P[] is not a balanced sequence of parentheses !! " << endl;
-			exit(0);
+			exit(1);
 		}else
 			cout << " DFUDS-P[] is a well balanced sequence of parentheses !! " << endl;
 	}
@@ -171,9 +178,6 @@ DFUDSrmq::DFUDSrmq(long int *A, ulong len) {
 		test_backward_search();
 		if (leaves>0) test_rmqi();
 	}
-	//test_rmqi();
-	//test_backward_search_block();
-	//test_backward_search();
 }
 
 void DFUDSrmq::createMinMaxTree(){
