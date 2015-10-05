@@ -44,7 +44,6 @@ DFUDSrmq::DFUDSrmq(long int *A, ulong len) {
 	if (nP % W64)
 		lenP++;
 	P = new ulong[lenP];
-	//ulong* P2 = new ulong[lenP];
 
 	sizeDS += lenP*sizeof(ulong);		// 2n bits OF TOPOLOGY ARE INCLUDED  !!
 	if (true || TRACE) cout << " ** size of topology " << lenP*sizeof(ulong) << " Bytes" << endl;
@@ -95,10 +94,6 @@ DFUDSrmq::DFUDSrmq(long int *A, ulong len) {
 		ulong r=0;
 
 		for (; r<nP; r++){
-			/*if(readBit64(P, r) != readBit64(P2, r)){
-				cout << " ERROR. readBit64(P, r) != readBit64(P2, r).... r = " << r << endl;
-				exit(1);
-			}*/
 			if(readBit64(P, r))
 				sum++;
 			else sum--;
@@ -293,7 +288,6 @@ void DFUDSrmq::createMinMaxTree(){
 
 				// Forward...
 				for (j=rb=0; j<N8Srmq; j++){
-					//segment = (P[(node*Srmq-1-BSrmq*j)>>BW64] & RMMMasks[rb]) >> (W64m8-BSrmq*rb);
 					segment = (P[((node-1)*Srmq+BSrmq*j)>>BW64] & RMMMasks[rb]) >> (W64m8-BSrmq*rb);
 					if (currSumFwd - T_MIN_FWDI[segment] < miniFwd)
 						miniFwd = currSumFwd - T_MIN_FWDI[segment];
@@ -303,7 +297,6 @@ void DFUDSrmq::createMinMaxTree(){
 					else rb++;
 				}
 				for (j=0; j<N8Srmq; j++){
-					//segment = (P[((node+1)*Srmq-1-BSrmq*j)>>BW64] & RMMMasks[rb]) >> (W64m8-BSrmq*rb);
 					segment = (P[(node*Srmq+BSrmq*j)>>BW64] & RMMMasks[rb]) >> (W64m8-BSrmq*rb);
 					if (currSumFwd - T_MIN_FWDI[segment] < miniFwd)
 						miniFwd = currSumFwd - T_MIN_FWDI[segment];
@@ -347,56 +340,6 @@ void DFUDSrmq::createMinMaxTree(){
 					currSumBack -= sumAtPos(auxL[child]-1);
 				if (currSumBack + Aux_Back_MaxIN[child-1] > maxBck)
 					maxBck = currSumBack + Aux_Back_MaxIN[child-1];
-
-				/*long int ss=0;
-				long int mmm=-100000;
-				for(long int ii=auxR[child]; ii>= (long int)auxL[child-1]; ii--){
-					if (readBit64(P, ii)){
-						ss++;
-						if(ss > mmm)
-							mmm = ss;
-					}else
-						ss--;
-				}
-
-				if(maxBck != mmm){
-					cout << "ERRRRRRRRRRR i= " << i << endl;
-					cout << "maxBck = " << maxBck << endl;
-					cout << "mmm = " << mmm << endl;
-
-					long int ss2=0;
-					long int mmm2=-100000;
-					for(long int ii=auxR[child]; ii>= (long int)auxL[child]; ii--){
-						if (readBit64(P, ii)){
-							ss2++;
-							if(ss2 > mmm2)
-								mmm2 = ss2;
-						}else
-							ss2--;
-					}
-
-					cout << "ERRRRRRRRRRRR currSumBack = " << currSumBack << " != " << ss2 << endl;
-					cout << "Aux_Back_MaxIN[child] = " << Aux_Back_MaxIN[child] << endl;
-					cout << "mmm2 = " << mmm2 << endl;
-
-
-					long int ss3=0;
-					long int mmm3=-100000;
-					for(long int ii=auxR[child-1]; ii>= auxL[child-1]; ii--){
-						if (readBit64(P, ii)){
-							ss3++;
-							if(ss3 > mmm3)
-								mmm3 = ss3;
-						}else
-							ss3--;
-					}
-					cout << "Aux_Back_MaxIN[child-1] = " << Aux_Back_MaxIN[child-1] << endl;
-					cout << "mmm3 = " << mmm3 << endl;
-
-					exit(0);
-
-				}*/
-
 			}
 			Aux_Fwd_MinIN[i-1] = miniFwd;
 			Aux_Back_MaxIN[i-1] = maxBck;
@@ -928,10 +871,7 @@ ulong DFUDSrmq::select_0(ulong i){
 }
 
 ulong DFUDSrmq::open_0(ulong i){
-	ulong pos=0;
-
-
-	return pos;
+	return 0;
 }
 
 // give the excess from 0 to pos
@@ -1201,7 +1141,6 @@ ulong DFUDSrmq::rmqi_rmm(ulong x1, ulong x2, long int *min, long int *currSum, u
 		node += cantIN-leavesBottom;
 
 	node /= 2;
-	//group = computeLeavesOfNode(node, dist);
 	group = cantLeavesOfNode(node);
 
 	while (rLeaf > aLeaf+group){
@@ -1223,7 +1162,6 @@ ulong DFUDSrmq::rmqi_rmm(ulong x1, ulong x2, long int *min, long int *currSum, u
 			dist++;
 		}
 
-		//group = computeLeavesOfNode(node, dist);
 		group = cantLeavesOfNode(node);
 	}
 
@@ -1232,7 +1170,6 @@ ulong DFUDSrmq::rmqi_rmm(ulong x1, ulong x2, long int *min, long int *currSum, u
 	node++;
 	dist--;
 	while (node < cantIN){
-		//group = computeLeavesOfNode(node, dist);
 		group = cantLeavesOfNode(node);
 		if(rLeaf > aLeaf+group){
 			aLeaf += group;
@@ -1318,7 +1255,6 @@ ulong DFUDSrmq::rmqi_rmm(ulong x1, ulong x2, long int *min, long int *currSum, u
 				Min = sum - mini;
 				posMin = (node<<PotSrmq) + TPMinB[node];
 			}
-			//sum += getNum64(TSBlock, (aLeaf+1)*lgMAX_SupB, lgMAX_SupB) - getNum64(TSBlock, aLeaf*lgMAX_SupB, lgMAX_SupB);
 			if(readBit64(Bfull, aLeaf)){
 				if(TRBlock[aLeaf])
 					sum -= Srmq;
@@ -1511,15 +1447,6 @@ ulong DFUDSrmq::backward_search_rmm(long int exc, ulong j){
 	// this covers two leaves:node-1 and node
 	backward_search_block((node-1)<<PotSrmq, ((node+1)<<PotSrmq)-1, exc, &currSum, &posExc);
 	return posExc;
-	/*if(backward_search_block((node-1)<<PotSrmq, ((node+1)<<PotSrmq)-1, exc, &currSum, &posExc))
-		return posExc;
-	else{
-		ulong a = (node-1)<<PotSrmq;
-		ulong b = ((node+1)<<PotSrmq)-1;
-		cout << "ERRRRRRRR.. exc = " << exc << " not found !! in the last range [" << a << ", " << b << "]" << endl;
-		cout << "j = " << j << endl;
-		exit(1);
-	}*/
 }
 
 ulong DFUDSrmq::backward_search(long int exc, ulong j){
