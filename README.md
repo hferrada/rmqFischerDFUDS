@@ -7,7 +7,7 @@ hferrada@dcc.uchile.cl, gnavarro@dcc.uchile.cl
 Description:<br />
 This is an RMQ compressed data structure. The implementation is based on the method of Fischer and Heun [1].<br />
 Their method uses a tree representation with DFUDS. We use Range Min-Max Tree of Sadakane and Navarro [2].<br />
-In order to reduce the size, our rmq uses a simplified version of the Range min-max tree of Navarro and Sadakane [2], we used the forward minimum array to store the ranges (only for forward) and maximum backward array (only backward).<br />
+In order to reduce the size, our rmq uses a simplified version of the Range min-max tree of Navarro and Sadakane [2], we only used the forward minimum array to store the ranges (only for forward).<br />
 We included an small example ("rmqFischerDFUDS.cpp") to show how to use it and included an small experiment for the time. This works only for 64 bits and supporting long sequences.
 
 Make:<br />
