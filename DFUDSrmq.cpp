@@ -13,7 +13,7 @@
 
 bool DFUDSrmq::TRACE = false;
 bool DFUDSrmq::RUNTEST = false;
-uint DFUDSrmq::TEST = 100000;
+uint DFUDSrmq::TEST = 1000000;
 
 DFUDSrmq::DFUDSrmq(char *fileName){
 	loadDS(fileName);
@@ -180,7 +180,6 @@ void DFUDSrmq::createMinMaxTree(){
 	ulong i, j, position, father, node, cont, child, rb;
 	ulong *auxL, *auxR;
 	int *Aux_Fwd_MinIN;
-	int *Aux_Back_MaxIN;
 
 	if (h>0){
 		groups = (ulong)pow(2, (double)h-1.0);	// number of nodes at level (h-1)
@@ -267,12 +266,12 @@ void DFUDSrmq::createMinMaxTree(){
 	}
 
 	if (leaves>0){
-		int miniFwd, maxBck;
+		int miniFwd;
 		ulong segment;
 		long int currSumBack, currSumFwd;
 		Aux_Fwd_MinIN = new int[cantIN];
-		Aux_Back_MaxIN = new int[cantIN];
-		MAX_B = MIN_Fwd = MAX_Bck = 0;
+		//Aux_Back_MaxIN = new int[cantIN];
+		MAX_B = MIN_Fwd = 0;
 		// Step 3: set the relative min values for each internal node.
 		//cout << "Step 3: set the relative min values for each internal node..." << endl;
 		for(i=cantIN; i>0; i--){
@@ -284,7 +283,6 @@ void DFUDSrmq::createMinMaxTree(){
 					node = child - cantIN + leavesBottom;
 				currSumFwd = currSumBack = 0;
 				miniFwd = pow(2,31)-1;
-				maxBck = -256;
 
 				// Forward...
 				for (j=rb=0; j<N8Srmq; j++){
@@ -306,52 +304,16 @@ void DFUDSrmq::createMinMaxTree(){
 					else rb++;
 				}
 
-				// backward...
-				for (j=0, rb=N8W64-1; j<N8Srmq; j++){
-					segment = (P[((node+1)*Srmq-1-BSrmq*j)>>BW64] & RMMMasks[rb]) >> (W64m8-BSrmq*rb);
-					if (currSumBack + T_MAX_BCKDI[segment] > maxBck)
-						maxBck = currSumBack + T_MAX_BCKDI[segment];
-
-					currSumBack += T_SUM_BLOCK[segment];
-					if (rb == 0) rb=N8W64-1;
-					else rb--;
-				}
-				for (j=0; j<N8Srmq; j++){
-					segment = (P[(node*Srmq-1-BSrmq*j)>>BW64] & RMMMasks[rb]) >> (W64m8-BSrmq*rb);
-					if (currSumBack + T_MAX_BCKDI[segment] > maxBck)
-						maxBck = currSumBack + T_MAX_BCKDI[segment];
-
-					currSumBack += T_SUM_BLOCK[segment];
-					if (rb == 0) rb=N8W64-1;
-					else rb--;
-				}
 			}else{
 				miniFwd = Aux_Fwd_MinIN[child-1];
-				maxBck = Aux_Back_MaxIN[child];
 
 				currSumFwd = sumAtPos(auxR[child-1]);
 				if (auxL[child-1])
 					currSumFwd -= sumAtPos(auxL[child-1]-1);
 				if (currSumFwd + Aux_Fwd_MinIN[child] < miniFwd)
 					miniFwd = currSumFwd + Aux_Fwd_MinIN[child];
-
-				currSumBack = sumAtPos(auxR[child]);
-				if (auxL[child])
-					currSumBack -= sumAtPos(auxL[child]-1);
-				if (currSumBack + Aux_Back_MaxIN[child-1] > maxBck)
-					maxBck = currSumBack + Aux_Back_MaxIN[child-1];
 			}
 			Aux_Fwd_MinIN[i-1] = miniFwd;
-			Aux_Back_MaxIN[i-1] = maxBck;
-
-			if(maxBck < 0){
-				if (-1*maxBck > MAX_Bck)
-					MAX_Bck = -1*miniFwd;
-			}else{
-				if (maxBck > MAX_Bck)
-					MAX_Bck = maxBck;
-			}
-
 			if(miniFwd<0){
 				if (-1*miniFwd > MIN_Fwd)
 					MIN_Fwd = -1*miniFwd;
@@ -367,13 +329,8 @@ void DFUDSrmq::createMinMaxTree(){
 	lgMIN_Fwd = ceilingLog64(MIN_Fwd+1, 2);
 	if(lgMIN_Fwd==0)
 		lgMIN_Fwd=1;
-	lgMAX_Bck = ceilingLog64(MAX_Bck+1, 2);
-	if(lgMAX_Bck==0)
-		lgMAX_Bck=1;
-	if (TRACE){
+	if (TRACE)
 		cout << "MIN_Fwd (*-1) = " << MIN_Fwd << ", lgMIN_Fwd = " << lgMIN_Fwd << endl;
-		cout << "MAX_Fwd (*-1) = " << MAX_Bck << ", lgMAX_Fwd = " << lgMAX_Bck << endl;
-	}
 
 	sizeAux = cantIN*lgMIN_Fwd/W64;
 	if ((cantIN*lgMIN_Fwd)%W64)
@@ -389,24 +346,6 @@ void DFUDSrmq::createMinMaxTree(){
 	}
 	if (cantIN)
 		delete [] Aux_Fwd_MinIN;
-
-	sizeAux = cantIN*lgMAX_Bck/W64;
-	if ((cantIN*lgMAX_Bck)%W64)
-		sizeAux++;
-	Bck_MaxIN = new ulong[sizeAux];
-	sizeAux *= sizeof(ulong);
-	sizeDS += sizeAux;
-	if (true || TRACE) cout << " ** size of Bck_MaxIN[] " << sizeAux << " Bytes" << endl;
-	cont = 0; // count
-	for(i=0; i<cantIN; i++){
-		//cout << "Aux_Back_MaxIN[" << i << "] = " << Aux_Back_MaxIN[i] << endl;
-		if(Aux_Back_MaxIN[i] < 0)
-			Aux_Back_MaxIN[i] = 0;
-		setNum64(Bck_MaxIN, cont, lgMAX_Bck, Aux_Back_MaxIN[i]);
-		cont += lgMAX_Bck;
-	}
-	if (cantIN)
-		delete [] Aux_Back_MaxIN;
 }
 
 void DFUDSrmq::createTables(){
@@ -871,7 +810,10 @@ ulong DFUDSrmq::select_0(ulong i){
 }
 
 ulong DFUDSrmq::open_0(ulong i){
-	return 0;
+	ulong pos=0;
+
+	// not necesary!
+	return pos;
 }
 
 // give the excess from 0 to pos
@@ -1319,7 +1261,7 @@ ulong DFUDSrmq::rmqi_rmm(ulong x1, ulong x2, long int *min, long int *currSum, u
 		return ((nodeMin+1)<<PotSrmq)+TPMinB[nodeMin+1];
 }
 
-
+// exc < 0. return the position with excess = exc from x2 to x1
 bool DFUDSrmq::backward_search_block(ulong x1, ulong x2, long int exc, long int *sumPos, ulong *pos){
 	long int sum, aux;
 	uint rest, q;
@@ -1335,21 +1277,21 @@ bool DFUDSrmq::backward_search_block(ulong x1, ulong x2, long int exc, long int 
 			q = ((P[b-1] << rest) | (P[b] >> (W64-rest))) & 0xff;
 
 		aux = T_MAX_BCKDI[q];
-		if (sum+aux >= exc){
-			while(sum < exc){
+		if (sum-aux <= exc){
+			while(sum > exc){
 				if(readBit64(P,x2)){
-					sum++;
+					sum--;
 					if(sum==exc){
 						*pos = x2;
 						*sumPos = sum;
 						return true;
 					}
 				}else
-					sum--;
+					sum++;
 				x2--;
 			}
 		}
-		sum += T_SUM_BLOCK[q];
+		sum -= T_SUM_BLOCK[q];
 		len -= BSrmq;
 		x2 -= BSrmq;
 	}
@@ -1358,14 +1300,14 @@ bool DFUDSrmq::backward_search_block(ulong x1, ulong x2, long int exc, long int 
 		// check last segment (len < 8) bit by bit...
 		while (len>=1){
 			if(readBit64(P,x2)){
-				sum++;
+				sum--;
 				if(sum==exc){
 					*pos = x2;
 					*sumPos = sum;
 					return true;
 				}
 			}else
-				sum--;
+				sum++;
 			x2--;
 			len--;
 		}
@@ -1377,7 +1319,7 @@ bool DFUDSrmq::backward_search_block(ulong x1, ulong x2, long int exc, long int 
 
 ulong DFUDSrmq::backward_search_rmm(long int exc, ulong j){
 	ulong node, posExc, dist = 1;
-	long int currSum, max;
+	long int currSum, min, sNod;
 
 	currSum = 0;
 	node = j>>PotSrmq;
@@ -1411,16 +1353,19 @@ ulong DFUDSrmq::backward_search_rmm(long int exc, ulong j){
 	node>>= 1;
 	node--;
 	dist++;
-	max = currSum+getNum64(Bck_MaxIN, node*lgMAX_Bck, lgMAX_Bck);
-	while (max < exc){
-		currSum += computeSumOfNode(node+1, dist);
+
+	sNod = computeSumOfNode(node+1, dist);
+	min = -1*sNod-getNum64(Fwd_MinIN, node*lgMIN_Fwd, lgMIN_Fwd);
+	while (min > exc-currSum){
+		currSum -= sNod;
 		if (node%2==0)			// go to my left sibling
 			node--;
 		else{
 			node=node/2-1;		// go to my uncle
 			dist++;
 		}
-		max = currSum+getNum64(Bck_MaxIN, node*lgMAX_Bck, lgMAX_Bck);
+		sNod = computeSumOfNode(node+1, dist);
+		min = -1*sNod-getNum64(Fwd_MinIN, node*lgMIN_Fwd, lgMIN_Fwd);
 	}
 
 	// [4]- We move down recomputing the sum until to reach to the left that store the excess
@@ -1428,13 +1373,14 @@ ulong DFUDSrmq::backward_search_rmm(long int exc, ulong j){
 	node<<= 1;
 	dist--;
 	while (node < cantIN){
-		max = currSum+getNum64(Bck_MaxIN, node*lgMAX_Bck, lgMAX_Bck);
-		if (max >= exc){
+		sNod = computeSumOfNode(node+1, dist);
+		min = -1*sNod-getNum64(Fwd_MinIN, node*lgMIN_Fwd, lgMIN_Fwd);
+		if (min <= exc-currSum){
 			node++;			// go to my nephew
 			node<<= 1;
 			dist--;
 		}else{
-			currSum += computeSumOfNode(node+1, dist);
+			currSum -= sNod;
 			node--;			// go to my left sibling
 		}
 	}
@@ -1447,6 +1393,7 @@ ulong DFUDSrmq::backward_search_rmm(long int exc, ulong j){
 	// this covers two leaves:node-1 and node
 	backward_search_block((node-1)<<PotSrmq, ((node+1)<<PotSrmq)-1, exc, &currSum, &posExc);
 	return posExc;
+
 }
 
 ulong DFUDSrmq::backward_search(long int exc, ulong j){
@@ -1473,7 +1420,7 @@ ulong DFUDSrmq::queryRMQ(ulong i, ulong j){
 	ulong x = select_0(i+2);
 	ulong y = select_0(j+1);
 	ulong w = rmqi(x,y);
-	ulong openW = backward_search(1,w-1);
+	ulong openW = backward_search(-1,w-1);
 
 	if(openW-rank_1(openW) == i)
 		return i;
@@ -1512,8 +1459,6 @@ void DFUDSrmq::saveDS(char *fileName){
 		cout << "lgMAX_SupB " << lgMAX_SupB << endl;
 		cout << "lgMIN_Fwd " << lgMIN_Fwd << endl;
 		cout << "MIN_Fwd " << MIN_Fwd << endl;
-		cout << "lgMAX_Bck " << lgMAX_Bck << endl;
-		cout << "MAX_Bck " << MAX_Bck << endl;
 	}
 
 	os.write((const char*)&nP, sizeof(ulong));
@@ -1536,8 +1481,6 @@ void DFUDSrmq::saveDS(char *fileName){
 	os.write((const char*)&lgMAX_SupB, sizeof(uint));
 	os.write((const char*)&lgMIN_Fwd, sizeof(uint));
 	os.write((const char*)&MIN_Fwd, sizeof(int));
-	os.write((const char*)&lgMAX_Bck, sizeof(uint));
-	os.write((const char*)&MAX_Bck, sizeof(uint));
 
 	ulong sizeDT = 10*sizeof(ulong) + 11*sizeof(uint) + sizeof(int);
 	sizeDT +=  2*(512 + 256);				// size for T_SUM_BLOCK[] + T_MIN_FWDI[] + T_MAX_BCKDI[] + PT_MIN_FWDI[]
@@ -1556,13 +1499,6 @@ void DFUDSrmq::saveDS(char *fileName){
 	os.write((const char*)Fwd_MinIN, size*sizeof(ulong));		// save Fwd_MinIN[]
 	sizeDT += size*sizeof(ulong);
 	if(TRACE) cout << " .- Fwd_MinIN[] " << size*sizeof(ulong) << " Bytes" << endl;
-
-	size = cantIN*lgMAX_Bck/W64;
-	if ((cantIN*lgMAX_Bck)%W64)
-		size++;
-	os.write((const char*)Bck_MaxIN, size*sizeof(ulong));		// save Bck_MaxIN[]
-	sizeDT += size*sizeof(ulong);
-	if(TRACE) cout << " .- Bck_MaxIN[] " << size*sizeof(ulong) << " Bytes" << endl;
 
 	size = lenSB*lgMAX_SupB/W64;
 	if ((lenSB*lgMAX_SupB)%W64)
@@ -1621,8 +1557,6 @@ void DFUDSrmq::loadDS(char *fileName){
 	is.read((char*)&lgMAX_SupB, sizeof(uint));
 	is.read((char*)&lgMIN_Fwd, sizeof(uint));
 	is.read((char*)&MIN_Fwd, sizeof(int));
-	is.read((char*)&lgMAX_Bck, sizeof(uint));
-	is.read((char*)&MAX_Bck, sizeof(uint));
 
 	if(TRACE){
 		cout << "Variables load: " << endl;
@@ -1646,8 +1580,6 @@ void DFUDSrmq::loadDS(char *fileName){
 		cout << "lgMAX_SupB " << lgMAX_SupB << endl;
 		cout << "lgMIN_Fwd " << lgMIN_Fwd << endl;
 		cout << "MIN_Fwd " << MIN_Fwd << endl;
-		cout << "lgMAX_Bck " << lgMAX_Bck << endl;
-		cout << "MAX_Bck " << MAX_Bck << endl;
 	}
 
 	// size for variables
@@ -1670,14 +1602,6 @@ void DFUDSrmq::loadDS(char *fileName){
 	is.read((char*)Fwd_MinIN, sizeAux*sizeof(ulong));
 	sizeDS += sizeAux*sizeof(ulong);
 	if(TRACE) cout << " .- Fwd_MinIN[] " << sizeAux*sizeof(ulong) << " Bytes" << endl;
-
-	sizeAux = cantIN*lgMAX_Bck/W64;
-	if ((cantIN*lgMAX_Bck)%W64)
-		sizeAux++;
-	Bck_MaxIN = new ulong[sizeAux];
-	is.read((char*)Bck_MaxIN, sizeAux*sizeof(ulong));
-	sizeDS += sizeAux*sizeof(ulong);
-	if(TRACE) cout << " .- Bck_MaxIN[] " << sizeAux*sizeof(ulong) << " Bytes" << endl;
 
 	sizeAux = lenSB*lgMAX_SupB/W64;
 	if ((lenSB*lgMAX_SupB)%W64)
@@ -1797,10 +1721,10 @@ DFUDSrmq::~DFUDSrmq() {
 	nP = nW = rank1_Bin = nBin = cantN = cantIN = leaves =
 	leavesBottom = firstLeaf = lenSB = lenLB = bitsSuB =
 	bitsRB = h = MAX_B = lgMAX_B = MAX_SupB = lgMAX_SupB =
-	lgMIN_Fwd = MIN_Fwd = lgMAX_Bck = MAX_Bck = sizeDS = 0;
+	lgMIN_Fwd = MIN_Fwd = sizeDS = 0;
 
 	delete [] Fwd_MinIN;
-	delete [] Bck_MaxIN;
+	//delete [] Bck_MaxIN;
 	delete [] TSBlock;
 	delete [] TRBlock;
 	delete [] Bfull;
@@ -2121,16 +2045,18 @@ void DFUDSrmq::test_backward_search_block(){
 	for (ulong t=0; t<TEST; t++){
 		j = nP/2 + (rand() % (nP/2)-2);
 		for (; readBit64(P, j); j++);
-		exc = 1;
+		exc = -1;
 		sum = 0;
 		k = j;
 		while(k && sum != exc){
 			k--;
 			if(readBit64(P, k)){
-				sum++;
-			}else
 				sum--;
+			}else
+				sum++;
 		}
+		// k is the position !!
+
 		sum = 0;
 		if(backward_search_block(0, j-1, exc, &sum, &posExc)){
 			if (k != posExc){
@@ -2146,21 +2072,22 @@ void DFUDSrmq::test_backward_search(){
 	long int sum, exc, k;
 	ulong j, posExc;
 
-	/*j=55301;
+	/*j=558;
 	if (readBit64(P, j))
 		cout << "OPEN" << endl;
 	for (; readBit64(P, j); j++);
-	exc = 1;
+	exc = -1;
 	sum = 0;
 	k = j;
 	while(k && sum != exc){
 		k--;
 		if(readBit64(P, k)){
-			sum++;
-		}else
 			sum--;
+		}else
+			sum++;
 	}
 	cout << "OPEN PAR (" << j << ") = " << k << endl;
+
 	sum = 0;
 	posExc = backward_search(exc, j-1);
 	if (k != posExc){
@@ -2173,16 +2100,18 @@ void DFUDSrmq::test_backward_search(){
 		j = nP/2 + (rand() % (nP/2)-2);
 
 		for (; readBit64(P, j); j++);
-		exc = 1;
+		exc = -1;
 		sum = 0;
 		k = j;
 		while(k && sum != exc){
 			k--;
 			if(readBit64(P, k)){
-				sum++;
-			}else
 				sum--;
+			}else
+				sum++;
 		}
+		// k is the position !!
+
 		sum = 0;
 		posExc = backward_search(exc, j-1);
 		if (k != posExc){
@@ -2192,159 +2121,3 @@ void DFUDSrmq::test_backward_search(){
 	}
 	cout << "  test_backward_search() OK !!" << endl;
 }
-
-/*
-void DFUDSrmq::test_search_max_block(){
-	long int sum, Max, k, i, j, posMax;
-
-	i=3, j=47;
-	for (k=i, sum=0; k<=(long int)j && !readBit64(P, k); k++, sum--);
-	sum++;
-	Max=sum;
-	posMax=k;
-	for (k++; k<=(long int)j; k++){
-		if(readBit64(P, k)){
-			sum++;
-			if (sum >= Max){
-				Max = sum;
-				posMax = k;
-			}
-		}else
-			sum--;
-	}
-	cout << "MAXIMO(" << i << ", " << j << ") = " << Max << ", posMin = " << posMax << endl;
-	long int max, curSum;
-	ulong position;
-	max = curSum = 0;
-	position = i;
-	for (k=i, curSum=0; k<=(long int)j && !readBit64(P, k); k++, curSum--);
-	curSum++;
-	max=curSum;
-	position=k;
-	search_max_block(k+1,j,&max, &curSum, &position);
-	if (position != posMax || max != Max){
-		cout << "ERROR !!... search_min_block(" << i << ", " << j << ") = " << position << " != " << posMax << endl;
-		cout << "maximum found = " << max << " =? " << Max << endl;
-		exit(1);
-	}
-
-
-	cout << "DFUDSrmq::test_search_max_block()..." << endl;
-
-	for (ulong t=0; t<TEST; t++){
-		i = (rand() % (nP/2));
-		j = nP/2 + (rand() % (nP/2)-2);
-
-		for (k=i, sum=0; k<=(long int)j && !readBit64(P, k); k++, sum--);
-		sum++;
-		Max=sum;
-		posMax=k;
-		if (k>j) continue;
-		for (k++; k<=(long int)j; k++){
-			if(readBit64(P, k)){
-				sum++;
-				if (sum >= Max){
-					Max = sum;
-					posMax = k;
-				}
-			}else
-				sum--;
-		}
-
-		//if (TRACE) cout << "search_min_block(" << i << ", " << j << ") " << endl;
-		long int max, curSum;
-		ulong position;
-		max = curSum = 0;
-		position = i;
-
-		for (k=i, curSum=0; k<=(long int)j && !readBit64(P, k); k++, curSum--);
-		curSum++;
-		max=curSum;
-		position=k;
-		search_max_block(k+1,j,&max, &curSum, &position);
-		if (position != posMax || max != Max){
-			cout << "ERROR !!... search_max_block(" << i << ", " << j << ") = " << position << " != " << posMax << endl;
-			cout << "maximum found = " << max << " =? " << Max << endl;
-			exit(1);
-		}
-	}
-
-	cout << "  test_search_max_block() OK !!" << endl;
-}
-
-void DFUDSrmq::search_max_block(ulong x1, ulong x2, long int *max, long int *curSum, ulong *position){
-	long int Max, sum, auxMax, sumMax;
-	uint rest, q;
-	ulong b, len = x2-x1+1, posMax = *position;
-
-	Max = *max;
-	sum = *curSum;
-	while(len > BrmqMOne){
-		b = x1>>BW64;
-		rest = (x1+8)%W64;
-		if (b == (x1+BrmqMOne)>>BW64)				// x1 and (x1+7) are in the same word...
-			q = (P[b] >> (W64-rest)) & 0xff;
-		else
-			q = ((P[b] << rest) | (P[b+1] >> (W64-rest))) & 0xff;
-		auxMax = T_MAX_FWDI[q];
-		if (sum+auxMax >= Max){
-			Max = sum+auxMax;
-			posMax = x1;
-			sumMax = sum;
-		}
-		sum += T_SUM_BLOCK[q];
-		len -= BSrmq;
-		x1 += BSrmq;
-	}
-
-	// max in block that starts in posMax...
-	b=posMax;
-	for(rest=0; rest<8; b++, rest++){
-		if(readBit64(P,b)){
-			sumMax++;
-			if(sumMax==Max)
-				posMax=b;
-		}else
-			sumMax--;
-	}
-
-	if (len){
-		// check last segment (len < 8) bit by bit...
-		while (len>=1){
-			if(readBit64(P,x1)){
-				sum++;
-				if(sum>=Max){
-					Max=sum;
-					posMax=x1;
-				}
-			}else
-				sum--;
-			x1++;
-			len--;
-		}
-	}
-	*curSum = sum;
-	*max = Max;
-	*position = posMax;
-}
-
-// 512 bytes
-const short int T_MAX_FWDI[] = {
-		-8,-6,-5,-4,-4,-4,-3,-2,-3,-3,-3,-2,-2,-2,-1,0,
-		-2,-2,-2,-2,-2,-2,-1,0,-1,-1,-1,0,0,0,1,2,
-		-1,-1,-1,-1,-1,-1,-1,0,-1,-1,-1,0,0,0,1,2,
-		0,0,0,0,0,0,1,2,1,1,1,2,2,2,3,4,
-		0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,2,
-		0,0,0,0,0,0,1,2,1,1,1,2,2,2,3,4,
-		1,1,1,1,1,1,1,2,1,1,1,2,2,2,3,4,
-		2,2,2,2,2,2,3,4,3,3,3,4,4,4,5,6,
-		1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2,
-		1,1,1,1,1,1,1,2,1,1,1,2,2,2,3,4,
-		1,1,1,1,1,1,1,2,1,1,1,2,2,2,3,4,
-		2,2,2,2,2,2,3,4,3,3,3,4,4,4,5,6,
-		2,2,2,2,2,2,2,2,2,2,2,2,2,2,3,4,
-		2,2,2,2,2,2,3,4,3,3,3,4,4,4,5,6,
-		3,3,3,3,3,3,3,4,3,3,3,4,4,4,5,6,
-		4,4,4,4,4,4,5,6,5,5,5,6,6,6,7,8,
-};
-*/
