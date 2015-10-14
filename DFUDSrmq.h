@@ -13,18 +13,22 @@
 using namespace std;
 using namespace dfudsrmq;
 
+
 #define Srmq 256	// size of blocks (s bits each one), (power of 2 >= W)
 #define PotSrmq 8	// power for block = log(Srmq)
 #define SrmqD 512	// 2*Srmq
 #define SrmqM 128	// Srmq/2;
 #define N8Srmq 32 	// Srmq/8;
 
+/*
+test with small blocks ...
 
-/*#define Srmq 64		// size of blocks (s bits each one), (power of 2 >= W)
+#define Srmq 64		// size of blocks (s bits each one), (power of 2 >= W)
 #define PotSrmq 6	// power for block = log(Srmq)
 #define SrmqD 128	// 2*Srmq
 #define SrmqM 32	// Srmq/2;
-#define N8Srmq 8 	// Srmq/8;*/
+#define N8Srmq 8 	// Srmq/8;
+*/
 
 // FIXED VALUES:
 #define SuBrmq 2	// number of leaves for each super block (power of 2 > RB)
@@ -136,9 +140,10 @@ private:
 	int MIN_Fwd;			// the lowest value for forward intervals
 	uint lgMIN_Fwd;
 
-	ulong *Bck_MaxIN;		// the minimum excess value for internal nodes (stored as positive number)
-	uint MAX_Bck;			// the lowest value for forward intervals
-	uint lgMAX_Bck;
+	// NOT USED !!
+	//ulong *Bck_MaxIN;		// the minimum excess value for internal nodes (stored as positive number)
+	//uint MAX_Bck;			// the lowest value for forward intervals
+	//uint lgMAX_Bck;
 
 	ulong *TSBlock;			// Table of global excess for each superblock in P (groups of k blocks). Size = (n/ks)*MAXEXC
 	ulong lenSB;			// number of super/relative blocks
