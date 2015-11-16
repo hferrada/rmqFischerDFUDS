@@ -13,7 +13,7 @@
 
 bool DFUDSrmq::TRACE = false;
 bool DFUDSrmq::RUNTEST = false;
-uint DFUDSrmq::TEST = 1000000;
+uint DFUDSrmq::TEST = 10000;
 
 DFUDSrmq::DFUDSrmq(char *fileName){
 	loadDS(fileName);
@@ -36,15 +36,14 @@ DFUDSrmq::DFUDSrmq(long int *A, ulong len) {
 		cout << "Create BP sequence for 2D Min Heap..." << endl;
 	}
 
-	sizeDS = 2*(512 + 256);										// size for T_SUM_BLOCK[] + T_MIN_FWDI[] + T_MAX_BCKDI[] + PT_MIN_FWDI[]
-	sizeDS += 10*sizeof(ulong) + 10*sizeof(uint) + sizeof(int);	// size for variables
+	sizeDS = 2*512 + 3*256;										// size for T_SUM_BLOCK[] + T_MIN_FWDI[] + T_MAX_BCKDI[] + PT_MIN_FWDI[] + POPC0[]
+	sizeDS += 11*sizeof(ulong) + 10*sizeof(uint) + sizeof(int);	// size for variables
 
 	nP = (len+1)<<1;
 	ulong lenP = nP >> BW64;
 	if (nP % W64)
 		lenP++;
 	P = new ulong[lenP];
-
 	sizeDS += lenP*sizeof(ulong);		// 2n bits OF TOPOLOGY ARE INCLUDED  !!
 	if (true || TRACE) cout << " ** size of topology " << lenP*sizeof(ulong) << " Bytes" << endl;
 
@@ -173,6 +172,7 @@ DFUDSrmq::DFUDSrmq(long int *A, ulong len) {
 		test_backward_search();
 		if (leaves>0) test_rmqi();
 	}
+	test_select_0();
 }
 
 void DFUDSrmq::createMinMaxTree(){
@@ -329,8 +329,10 @@ void DFUDSrmq::createMinMaxTree(){
 	lgMIN_Fwd = ceilingLog64(MIN_Fwd+1, 2);
 	if(lgMIN_Fwd==0)
 		lgMIN_Fwd=1;
-	if (TRACE)
+	if (TRACE){
 		cout << "MIN_Fwd (*-1) = " << MIN_Fwd << ", lgMIN_Fwd = " << lgMIN_Fwd << endl;
+		//cout << "MAX_Fwd (*-1) = " << MAX_Bck << ", lgMAX_Fwd = " << lgMAX_Bck << endl;
+	}
 
 	sizeAux = cantIN*lgMIN_Fwd/W64;
 	if ((cantIN*lgMIN_Fwd)%W64)
@@ -357,7 +359,7 @@ void DFUDSrmq::createTables(){
 	bitsSuB = Srmq*SuBrmq;
 	ulong *AuxTSBlock = new ulong[lenSB];
 
-	TRBlock = new char[lenSB];
+	TRBlock = new char[lenSB];				// ???
 	sizeAux = (lenSB-1)*sizeof(char);
 	sizeDS += sizeAux;
 	if (true || TRACE) cout << " ** size of TRBlock[] " << sizeAux << " Bytes" << endl;
@@ -373,7 +375,7 @@ void DFUDSrmq::createTables(){
 	j = leaves/W64;
 	if (j%W64)
 		j++;
-	TPMinB = new uchar[leaves];		// positions explicitly
+	TPMinB = new uchar[leaves];		// positions explicitly  ????
 	sizeAux = leaves*sizeof(uchar);
 	sizeDS += sizeAux;
 	if (true || TRACE) cout << " ** size of TPMinB[] " << sizeAux << " Bytes" << endl;
@@ -517,6 +519,9 @@ void DFUDSrmq::createTables(){
 
 	for (i=cont=0; i<lenSB; i++, cont+=lgMAX_SupB)
 		setNum64(TSBlock, cont, lgMAX_SupB, AuxTSBlock[i]);
+
+	zeSB = ((lenSB-1)*bitsSuB - AuxTSBlock[lenSB-1])>>1;
+
 	if (lenSB)
 		delete [] AuxTSBlock;
 
@@ -550,8 +555,7 @@ void DFUDSrmq::createTables(){
 
 // for 0 <= i < n
 ulong DFUDSrmq::binRank_1(ulong i){
-	long int sum = sumAtPos(i);
-	return (sum+i+1)>>1;
+	return (sumAtPos(i)+i+1)>>1;
 }
 
 // for 0 <= i < n
@@ -778,6 +782,65 @@ ulong DFUDSrmq::binSelect_0(ulong i){
 }
 
 ulong DFUDSrmq::select_0(ulong i){
+	ulong z, nxt, curr, pos, l, r, m;
+
+	if (i <= zeSB){
+		l=(i>>1)/bitsSuB;
+		r=lenSB;
+		m=(lenSB-l)>>1;
+		z = (m*bitsSuB-getNum64(TSBlock, m*lgMAX_SupB, lgMAX_SupB))>>1;
+		nxt = ((m+1)*bitsSuB-getNum64(TSBlock, (m+1)*lgMAX_SupB, lgMAX_SupB))>>1;
+		while ((z>=i || nxt<i) && m<lenSB){
+			if(z>=i)
+				r = m-1;
+			else
+				l = m+1;
+			m = l+((r-l)>>1);
+			z = (m*bitsSuB - getNum64(TSBlock, m*lgMAX_SupB, lgMAX_SupB))>>1;
+			nxt = ((m+1)*bitsSuB - getNum64(TSBlock, (m+1)*lgMAX_SupB, lgMAX_SupB))>>1;
+		}
+		curr = m*bitsSuB + BrmqMOne;
+	}else{
+		z = zeSB;
+		m = (lenSB-1);
+		curr = m*bitsSuB + BrmqMOne;
+	}
+
+	if(readBit64(Bfull, m)){
+		if(TRBlock[m])
+			nxt = z;
+		else
+			nxt = z + Srmq;
+	}else
+		nxt = z + SrmqM - TRBlock[m];
+
+	if (nxt < i){
+		z = nxt;
+		curr += Srmq;
+	}
+
+	l = 0;
+	r = (P[curr>>BW64] & RMMMasks[0]) >> W64m8;
+	nxt = z + POPC0[r];
+	while (nxt < i){
+		z = nxt;
+		l++;
+		if (l == N8W64)
+			l=0;
+		curr+=BSrmq;
+		r = (P[curr>>BW64] & RMMMasks[l]) >> (W64m8-BSrmq*l);
+		nxt += POPC0[r];
+	}
+	pos=curr-BrmqMOne;
+	for (; z<i; pos++){
+		if (!readBit64(P, pos))
+			z++;
+	}
+
+	return pos-1;
+}
+
+ulong DFUDSrmq::select_0_old(ulong i){
 	ulong pos = 0;
 
 	if(i <= (nBin-rank1_Bin))
@@ -1082,7 +1145,7 @@ ulong DFUDSrmq::rmqi_rmm(ulong x1, ulong x2, long int *min, long int *currSum, u
 	}else
 		node += cantIN-leavesBottom;
 
-	node /= 2;
+	node >>= 1;
 	group = cantLeavesOfNode(node);
 
 	while (rLeaf > aLeaf+group){
@@ -1167,7 +1230,7 @@ ulong DFUDSrmq::rmqi_rmm(ulong x1, ulong x2, long int *min, long int *currSum, u
 					else
 						sum += Srmq;
 				}else
-					sum += 2*TRBlock[aLeaf];
+					sum += (TRBlock[aLeaf]<<1);
 				node++;
 				*min = Min;
 				*currSum = sum;
@@ -1181,7 +1244,7 @@ ulong DFUDSrmq::rmqi_rmm(ulong x1, ulong x2, long int *min, long int *currSum, u
 				else
 					sum += Srmq;
 			}else
-				sum += 2*TRBlock[aLeaf];
+				sum += (TRBlock[aLeaf]<<1);
 			mini = Min;
 			node++;
 			search_min_block(node<<PotSrmq, x2, &mini, &sum, &posMin);
@@ -1218,7 +1281,6 @@ ulong DFUDSrmq::rmqi_rmm(ulong x1, ulong x2, long int *min, long int *currSum, u
 		return posMin;
 	}
 
-
 	// [6] Here the minimum value is in a block which descent of the internal node 'nodeMin',
 	// then we must descent in order to find its position.
 	nodeMin<<= 1;
@@ -1253,7 +1315,7 @@ ulong DFUDSrmq::rmqi_rmm(ulong x1, ulong x2, long int *min, long int *currSum, u
 		else
 			sumMin = Srmq;
 	}else
-		sumMin = 2*TRBlock[aLeaf];
+		sumMin = (TRBlock[aLeaf]<<1);
 
 	if ((long int)getNum64(TMinB, nodeMin*lgMAX_B, lgMAX_B) >= (long int)getNum64(TMinB, (nodeMin+1)*lgMAX_B, lgMAX_B)-sumMin){
 		return (nodeMin<<PotSrmq)+TPMinB[nodeMin];
@@ -1333,7 +1395,6 @@ ulong DFUDSrmq::backward_search_rmm(long int exc, ulong j){
 		if (backward_search_block(node<<PotSrmq, j, exc, &currSum, &posExc))
 			return posExc;
 	}
-
 
 	// [2]- We search in the next leaf <--
 	if (node%2){	// this is a right leaf --> we go to the left
@@ -1449,6 +1510,7 @@ void DFUDSrmq::saveDS(char *fileName){
 		cout << "leavesBottom " << leavesBottom << endl;
 		cout << "firstLeaf " << firstLeaf << endl;
 		cout << "lenSB " << lenSB << endl;
+		cout << "zeSB " << zeSB << endl;
 		cout << "lenLB " << lenLB << endl;
 		cout << "bitsSuB " << bitsSuB << endl;
 		cout << "bitsRB " << bitsRB << endl;
@@ -1471,6 +1533,7 @@ void DFUDSrmq::saveDS(char *fileName){
 	os.write((const char*)&leavesBottom, sizeof(ulong));
 	os.write((const char*)&firstLeaf, sizeof(ulong));
 	os.write((const char*)&lenSB, sizeof(ulong));
+	os.write((const char*)&zeSB, sizeof(ulong));
 	os.write((const char*)&lenLB, sizeof(uint));
 	os.write((const char*)&bitsSuB, sizeof(uint));
 	os.write((const char*)&bitsRB, sizeof(uint));
@@ -1482,7 +1545,9 @@ void DFUDSrmq::saveDS(char *fileName){
 	os.write((const char*)&lgMIN_Fwd, sizeof(uint));
 	os.write((const char*)&MIN_Fwd, sizeof(int));
 
-	ulong sizeDT = 10*sizeof(ulong) + 11*sizeof(uint) + sizeof(int);
+	TRACE = true;
+
+	ulong sizeDT = 11*sizeof(ulong) + 10*sizeof(uint) + sizeof(int);
 	sizeDT +=  2*(512 + 256);				// size for T_SUM_BLOCK[] + T_MIN_FWDI[] + T_MAX_BCKDI[] + PT_MIN_FWDI[]
 	if(TRACE) cout << " .- T_SUM_BLOCK[] + T_MIN_FWDI[] + T_MAX_BCKDI[] + PT_MIN_FWDI[] + Variables " << sizeDT << " Bytes" << endl;
 
@@ -1531,6 +1596,7 @@ void DFUDSrmq::saveDS(char *fileName){
 
 	os.close();
 	cout << "   Total bytes saved from data structure: " << sizeDT << endl;
+	TRACE = false;
 }
 
 void DFUDSrmq::loadDS(char *fileName){
@@ -1547,6 +1613,7 @@ void DFUDSrmq::loadDS(char *fileName){
 	is.read((char*)&leavesBottom, sizeof(ulong));
 	is.read((char*)&firstLeaf, sizeof(ulong));
 	is.read((char*)&lenSB, sizeof(ulong));
+	is.read((char*)&zeSB, sizeof(ulong));
 	is.read((char*)&lenLB, sizeof(uint));
 	is.read((char*)&bitsSuB, sizeof(uint));
 	is.read((char*)&bitsRB, sizeof(uint));
@@ -1570,6 +1637,7 @@ void DFUDSrmq::loadDS(char *fileName){
 		cout << "leaves " << leaves << endl;
 		cout << "firstLeaf " << firstLeaf << endl;
 		cout << "lenSB " << lenSB << endl;
+		cout << "zeSB " << zeSB << endl;
 		cout << "lenLB " << lenLB << endl;
 		cout << "bitsSuB " << bitsSuB << endl;
 		cout << "bitsRB " << bitsRB << endl;
@@ -1582,8 +1650,9 @@ void DFUDSrmq::loadDS(char *fileName){
 		cout << "MIN_Fwd " << MIN_Fwd << endl;
 	}
 
+	TRACE = true;
 	// size for variables
-	sizeDS = 10*sizeof(ulong) + 11*sizeof(uint) + sizeof(int);
+	sizeDS = 11*sizeof(ulong) + 10*sizeof(uint) + sizeof(int);
 	sizeDS += 2*(512 + 256);									// size for T_SUM_BLOCK[] + T_MIN_FWDI[] + T_MAX_BCKDI[] + PT_MIN_FWDI[]
 	if(TRACE) cout << " .- T_SUM_BLOCK[] + T_MIN_FWDI[] + T_MAX_BCKDI[] + PT_MIN_FWDI[] + Variables " << sizeDS << " Bytes" << endl;
 
@@ -1639,6 +1708,7 @@ void DFUDSrmq::loadDS(char *fileName){
 
 	is.close();
 	cout << " Data Structure loaded !!" << endl;
+	TRACE = false;
 }
 
 // *************************** PRINT THE TREE ************************************
@@ -1812,7 +1882,7 @@ void DFUDSrmq::test_select_0(){
 	ulong sum0,sel,i,j,k;
 
 	cout << "DFUDSrmq::test_select_0..." << endl;
-	/*i=29;
+	/*i=4995;
 	for (j=sum0=0; sum0<i; j++){
 		if(!readBit64(P, j))
 			sum0++;
@@ -1820,8 +1890,8 @@ void DFUDSrmq::test_select_0(){
 	j--;
 	cout << "brute select_0("<<i<<") = " << j << endl;
 	sel = select_0(i);
-	cout << "funt. select_0 = " << sel << endl;
-	exit(0);*/
+	cout << "funct. select_0 = " << sel << endl;*/
+	//exit(0);
 
 	for (k=0; k<TEST; k++){
 		i = (rand() % ((nP>>1)-2)) + 1;
