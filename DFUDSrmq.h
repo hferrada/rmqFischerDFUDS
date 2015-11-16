@@ -7,28 +7,16 @@
 
 #ifndef DFUDSRMQ_H_
 #define DFUDSRMQ_H_z
-
 #include "Basicrmq.h"
-
 using namespace std;
 using namespace dfudsrmq;
-
 
 #define Srmq 256	// size of blocks (s bits each one), (power of 2 >= W)
 #define PotSrmq 8	// power for block = log(Srmq)
 #define SrmqD 512	// 2*Srmq
 #define SrmqM 128	// Srmq/2;
 #define N8Srmq 32 	// Srmq/8;
-
-/*
-test with small blocks ...
-
-#define Srmq 64		// size of blocks (s bits each one), (power of 2 >= W)
-#define PotSrmq 6	// power for block = log(Srmq)
-#define SrmqD 128	// 2*Srmq
-#define SrmqM 32	// Srmq/2;
-#define N8Srmq 8 	// Srmq/8;
-*/
+#define SaZe 512	// Sampling size for count zeros, it is the number of super blocks
 
 // FIXED VALUES:
 #define SuBrmq 2	// number of leaves for each super block (power of 2 > RB)
@@ -117,6 +105,25 @@ const uchar PT_MIN_FWDI[] = {
 		7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 };
 
+// 1 Bytes per cell --> 256 bytes
+const uchar POPC0[] = {
+		8,7,7,6,7,6,6,5,7,6,6,5,6,5,5,4,
+		7,6,6,5,6,5,5,4,6,5,5,4,5,4,4,3,
+		7,6,6,5,6,5,5,4,6,5,5,4,5,4,4,3,
+		6,5,5,4,5,4,4,3,5,4,4,3,4,3,3,2,
+		7,6,6,5,6,5,5,4,6,5,5,4,5,4,4,3,
+		6,5,5,4,5,4,4,3,5,4,4,3,4,3,3,2,
+		6,5,5,4,5,4,4,3,5,4,4,3,4,3,3,2,
+		5,4,4,3,4,3,3,2,4,3,3,2,3,2,2,1,
+		7,6,6,5,6,5,5,4,6,5,5,4,5,4,4,3,
+		6,5,5,4,5,4,4,3,5,4,4,3,4,3,3,2,
+		6,5,5,4,5,4,4,3,5,4,4,3,4,3,3,2,
+		5,4,4,3,4,3,3,2,4,3,3,2,3,2,2,1,
+		6,5,5,4,5,4,4,3,5,4,4,3,4,3,3,2,
+		5,4,4,3,4,3,3,2,4,3,3,2,3,2,2,1,
+		5,4,4,3,4,3,3,2,4,3,3,2,3,2,2,1,
+		4,3,3,2,3,2,2,1,3,2,2,1,2,1,1,0,
+};
 class DFUDSrmq {
 private:
 	ulong nW;				// number of words to store P
@@ -140,13 +147,11 @@ private:
 	int MIN_Fwd;			// the lowest value for forward intervals
 	uint lgMIN_Fwd;
 
-	// NOT USED !!
-	//ulong *Bck_MaxIN;		// the minimum excess value for internal nodes (stored as positive number)
-	//uint MAX_Bck;			// the lowest value for forward intervals
-	//uint lgMAX_Bck;
-
 	ulong *TSBlock;			// Table of global excess for each superblock in P (groups of k blocks). Size = (n/ks)*MAXEXC
 	ulong lenSB;			// number of super/relative blocks
+	ulong zeSB;				// number of 0 in all SB
+
+	ulong *SZ;				// Table of Sampling count for zeros
 	uint MAX_SupB;
 	uint lgMAX_SupB;
 	char *TRBlock;			// Table of excess relative only for the first block in each super block.
@@ -183,6 +188,7 @@ public:
 
 	ulong binSelect_0(ulong i);
 	ulong select_0(ulong i);
+	ulong select_0_old(ulong i);
 
 	// return the position of the "(" for the ")" at position i
 	ulong open_0(ulong i);
