@@ -48,44 +48,48 @@ DFUDSrmq::DFUDSrmq(long int *A, ulong len) {
 	if (true || TRACE) cout << " ** size of topology " << lenP*sizeof(ulong) << " Bytes" << endl;
 
 	cout << "Creating DFUDS sequence in P[1..2*len]" << endl;
-	ulong i, k, pos, item, childRoot=1;
-	long int j;
-	ulong *father = new ulong[len];
-	ulong *nChild = new ulong[len];
+	ulong k, pos, items, childRoot=1;
+	long int i;
 
-	cout << "Setting father and children..." << endl;
-	for(i=0; i<len; i++)
-		nChild[i]=0;
-	father[0] = -1;
-	for(i=1; i<len; i++){
-		j=i-1;
-		item = A[i];
-		while(j>=0 && A[j]>=item)
-			j = father[j];
-		if (j<0)
-			childRoot++;
-		else{
-			father[i] = j;
-			(nChild[j])++;
-		}
-	}
-	delete [] father;
+	pos=nP-1;
+	items = 0;
+	StackDFUDS *Q = new StackDFUDS();
+	StackDFUDS *R;
 
-	cout << "Putting parenthesis..." << endl;
-	setBit64(P, 0);
-	pos=1;
-	for(i=0; i<childRoot; i++, pos++)
-		setBit64(P, pos);
-	cleanBit64(P, pos);
-	pos++;
+	for(i=len-1; i>=0; i--){
+		cleanBit64(P, pos);	 	// close parenthesis for A[i]
+		pos--;
 
-	for(i=0; i<len; i++){
-		for(k=0; k<nChild[i]; k++, pos++)
+		// put a opening parenthesis for each value stored in Q, such that A[i]>Q->val, deleting these values from Q.
+		while(items && A[Q->val] > A[i]){
 			setBit64(P, pos);
-		cleanBit64(P, pos);
-		pos++;
+			pos--;
+			R = Q;
+			Q = Q->next;
+			delete R;
+			items--;
+		}
+
+		// insert A[i] into Q
+		R = new StackDFUDS();
+		R->val = i;
+		R->next = Q;
+		Q = R;
+		items++;
 	}
-	delete [] nChild;
+	cleanBit64(P, pos);	 	// close parenthesis for -infinity
+	pos--;
+	// put a opening parenthesis for each value stored in Q, such that A[i]>Q->val, deleting these values from Q.
+	while(items){
+		setBit64(P, pos);
+		pos--;
+		R = Q;
+		Q = Q->next;
+		delete R;
+		items--;
+	}
+	setBit64(P, pos);		// additional open parenthesis for -infinity
+
 	cout << "DFUDS TREE REPRESENTATION OK !!" << endl;
 
 	if(RUNTEST){ // test for balanced sequence
@@ -172,7 +176,6 @@ DFUDSrmq::DFUDSrmq(long int *A, ulong len) {
 		test_backward_search();
 		if (leaves>0) test_rmqi();
 	}
-	test_select_0();
 }
 
 void DFUDSrmq::createMinMaxTree(){
@@ -286,6 +289,7 @@ void DFUDSrmq::createMinMaxTree(){
 
 				// Forward...
 				for (j=rb=0; j<N8Srmq; j++){
+					//segment = (P[(node*Srmq-1-BSrmq*j)>>BW64] & RMMMasks[rb]) >> (W64m8-BSrmq*rb);
 					segment = (P[((node-1)*Srmq+BSrmq*j)>>BW64] & RMMMasks[rb]) >> (W64m8-BSrmq*rb);
 					if (currSumFwd - T_MIN_FWDI[segment] < miniFwd)
 						miniFwd = currSumFwd - T_MIN_FWDI[segment];
@@ -295,6 +299,7 @@ void DFUDSrmq::createMinMaxTree(){
 					else rb++;
 				}
 				for (j=0; j<N8Srmq; j++){
+					//segment = (P[((node+1)*Srmq-1-BSrmq*j)>>BW64] & RMMMasks[rb]) >> (W64m8-BSrmq*rb);
 					segment = (P[(node*Srmq+BSrmq*j)>>BW64] & RMMMasks[rb]) >> (W64m8-BSrmq*rb);
 					if (currSumFwd - T_MIN_FWDI[segment] < miniFwd)
 						miniFwd = currSumFwd - T_MIN_FWDI[segment];
@@ -358,6 +363,8 @@ void DFUDSrmq::createTables(){
 	lenSB = (nP/Srmq)/SuBrmq + 1;
 	bitsSuB = Srmq*SuBrmq;
 	ulong *AuxTSBlock = new ulong[lenSB];
+
+
 
 	TRBlock = new char[lenSB];				// ???
 	sizeAux = (lenSB-1)*sizeof(char);
@@ -1281,6 +1288,7 @@ ulong DFUDSrmq::rmqi_rmm(ulong x1, ulong x2, long int *min, long int *currSum, u
 		return posMin;
 	}
 
+
 	// [6] Here the minimum value is in a block which descent of the internal node 'nodeMin',
 	// then we must descent in order to find its position.
 	nodeMin<<= 1;
@@ -1395,6 +1403,7 @@ ulong DFUDSrmq::backward_search_rmm(long int exc, ulong j){
 		if (backward_search_block(node<<PotSrmq, j, exc, &currSum, &posExc))
 			return posExc;
 	}
+
 
 	// [2]- We search in the next leaf <--
 	if (node%2){	// this is a right leaf --> we go to the left

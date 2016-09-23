@@ -7,9 +7,12 @@
 
 #ifndef DFUDSRMQ_H_
 #define DFUDSRMQ_H_z
+
 #include "Basicrmq.h"
+
 using namespace std;
 using namespace dfudsrmq;
+
 
 #define Srmq 256	// size of blocks (s bits each one), (power of 2 >= W)
 #define PotSrmq 8	// power for block = log(Srmq)
@@ -17,6 +20,13 @@ using namespace dfudsrmq;
 #define SrmqM 128	// Srmq/2;
 #define N8Srmq 32 	// Srmq/8;
 #define SaZe 512	// Sampling size for count zeros, it is the number of super blocks
+
+//test values with small blocks ...
+/*#define Srmq 64		// size of blocks (s bits each one), (power of 2 >= W)
+#define PotSrmq 6	// power for block = log(Srmq)
+#define SrmqD 128	// 2*Srmq
+#define SrmqM 32	// Srmq/2;
+#define N8Srmq 8 	// Srmq/8;*/
 
 // FIXED VALUES:
 #define SuBrmq 2	// number of leaves for each super block (power of 2 > RB)
@@ -125,6 +135,10 @@ const uchar POPC0[] = {
 		4,3,3,2,3,2,2,1,3,2,2,1,2,1,1,0,
 };
 class DFUDSrmq {
+	typedef struct StackDFUDS{
+		long int val;
+		StackDFUDS *next;
+	} StackDFUDS;
 private:
 	ulong nW;				// number of words to store P
 	ulong *P;				// sequence of 2n' balanced parentheses, which represents a tree with n/2 nodes.
